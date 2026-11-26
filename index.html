@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Antigravity Studio</title>
+<style>
+:root{--bg:#0f1020;--panel:#191b33;--ink:#f2f3ff;--mute:#a4a8cc;--accent:#8b7bff;--line:#30345c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,system-ui,sans-serif}
+main{max-width:1000px;margin:auto;padding:16px}
+h1{margin:4px 0 12px;font-size:26px}
+nav{display:flex;gap:8px;margin-bottom:16px}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 16px;border-radius:10px;cursor:pointer;text-decoration:none;display:inline-block}
+button.on,button.go,.btn{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+label{display:block;color:var(--mute);font-size:14px;margin:10px 0 4px}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+input[type=range]{padding:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+canvas,video{display:block;max-width:100%;max-height:70vh;margin:auto;border-radius:10px;background:#000}
+#src{width:100%;max-height:30vh;margin-top:10px}
+.status{color:var(--mute);min-height:1.5em;margin:10px 0}
+.result video{max-height:40vh;margin-bottom:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Antigravity Studio</h1>
+<nav>
+  <button id="tabMake" class="on">Animated video</button>
+  <button id="tabClip">Clipper</button>
+</nav>
+
+<section id="make" class="grid">
+  <div class="panel">
+    <label for="title">Topic (title screen)</label>
+    <input id="title" value="Why do astronauts float?">
+    <label for="script">Script: one scene per line</label>
+    <textarea id="script" rows="7">It is not because gravity is gone.
+At the space station, gravity is still about 90% as strong.
+The station is always falling toward Earth.
+But it moves sideways so fast that it keeps missing.
+Astronauts fall with it, so they float!</textarea>
+    <label for="shape">Shape</label>
+    <select id="shape"><option value="v">Vertical 9:16 (Shorts, Reels)</option><option value="h">Wide 16:9 (YouTube)</option></select>
+    <label for="theme">Colours</label>
+    <select id="theme"><option value="0">Space</option><option value="1">Sunset</option><option value="2">Ocean</option></select>
+    <label for="voice">Voice-over or music (optional audio file)</label>
+    <input id="voice" type="file" accept="audio/*">
+    <div class="row"><button id="preview">Preview</button><button id="makeBtn" class="go">Create video</button></div>
+  </div>
+  <div class="panel">
+    <canvas id="makeCanvas" width="720" height="1280"></canvas>
+    <div class="status" id="makeStatus" role="status"></div>
+    <div class="result" id="makeResult"></div>
+  </div>
+</section>
+
+<section id="clip" class="grid" hidden>
+  <div class="panel">
+    <label for="file">Video file from your iPad (use only videos you have permission to use)</label>
+    <input id="file" type="file" accept="video/*">
+    <video id="src" controls playsinline preload="auto" hidden></video>
+    <div class="row"><button id="setStart">Set start here</button><button id="setEnd">Set end here</button></div>
+    <div class="grid">
+      <div><label for="start">Start (seconds)</label><input id="start" type="number" min="0" step="0.1" value="0"></div>
+      <div><label for="end">End (seconds)</label><input id="end" type="number" min="0" step="0.1" value="30"></div>
+    </div>
+    <label for="layout">Vertical layout</label>
+    <select id="layout"><option value="fill">Fill screen (crops sides)</option><option value="fit">Whole picture, blurred background</option></select>
+    <label for="pos">Crop position, left to right</label>
+    <input id="pos" type="range" min="0" max="1" step="0.01" value="0.5">
+    <label for="hook">Headline at top</label>
+    <input id="hook" placeholder="Wait for it...">
+    <label for="credit">Credit line</label>
+    <input id="credit" placeholder="Credit: @creatorname">
+    <div class="row"><button id="clipBtn" class="go" disabled>Create clip</button></div>
+  </div>
+  <div class="panel">
+    <canvas id="clipCanvas" width="720" height="1280"></canvas>
+    <div class="status" id="clipStatus" role="status"></div>
+    <div class="result" id="clipResult"></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let busy = false, cancel = null, audioCtx = null;
+
+function tab(name){
+  if (busy) return;
+  stopPreview();
+  $('make').hidden = name !== 'make'; $('clip').hidden = name !== 'clip';
+  $('tabMake').classList.toggle('on', name === 'make');
+  $('tabClip').classList.toggle('on', name === 'clip');
+}
+$('tabMake').onclick = () => tab('make');
+$('tabClip').onclick = () => tab('clip');
+
+function getAudio(){
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume();
+  return audioCtx;
+}
+
+function wrap(ctx, text, maxW){
+  const lines = []; let line = '';
+  for (let word of text.split(/\s+/)){
+    // break words that are wider than the frame
+    while (ctx.measureText(word).width > maxW && word.length > 1){
+      let n = word.length - 1;
+      while (n > 1 && ctx.measureText(word.slice(0,n)).width > maxW) n--;
+      if (line){ lines.push(line); line = ''; }
+      lines.push(word.slice(0,n)); word = word.slice(n);
+    }
+    const next = line ? line + ' ' + word : word;
+    if (ctx.measureText(next).width > maxW && line){ lines.push(line); line = word; }
+    else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function fitText(ctx, text, maxW, maxH, size){
+  let lines;
+  do {
+    ctx.font = `800 ${size}px -apple-system,system-ui,sans-serif`;
+    lines = wrap(ctx, text, maxW);
+    size -= 4;
+  } while (lines.length * (size+4) * 1.25 > maxH && size > 16);
+  return {lines, size: size + 4};
+}
+
+/* ---------- Recording ---------- */
+function startRecorder(canvas, audioStream){
+  if (!window.MediaRecorder || !canvas.captureStream) throw new Error('This browser cannot record video. Update iPadOS and use Safari.');
+  const stream = canvas.captureStream(30);
+  if (audioStream) audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const type = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']
+    .find(t => MediaRecorder.isTypeSupported(t));
+  const rec = new MediaRecorder(stream, {mimeType: type, videoBitsPerSecond: 6000000});
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const done = new Promise((res, rej) => {
+    rec.onstop = () => res(new Blob(chunks, {type: rec.mimeType || type}));
+    rec.onerror = () => rej(new Error('Recording failed.'));
+  });
+  rec.start(1000);
+  return {stop(){ if (rec.state !== 'inactive') rec.stop(); stream.getVideoTracks().forEach(t => t.stop()); return done; }};
+}
+
+function showResult(box, blob, name){
+  box.querySelectorAll('video').forEach(v => URL.revokeObjectURL(v.src));
+  box.textContent = '';
+  const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+  const url = URL.createObjectURL(blob);
+  const v = Object.assign(document.createElement('video'), {src:url, controls:true, playsInline:true});
+  const a = Object.assign(document.createElement('a'), {href:url, download:`${name}.${ext}`, textContent:'Download video', className:'btn'});
+  const row = document.createElement('div'); row.className = 'row'; row.append(a);
+  const file = new File([blob], `${name}.${ext}`, {type: blob.type.split(';')[0]});
+  if (navigator.canShare && navigator.canShare({files:[file]})){
+    const s = document.createElement('button'); s.textContent = 'Share / Save';
+    s.onclick = () => navigator.share({files:[file]}).catch(() => {});
+    row.append(s);
+  }
+  box.append(v, row);
+}
+
+function setBusy(b){
+  busy = b;
+  document.querySelectorAll('input,textarea,select,button').forEach(el => el.disabled = b);
+  $('src').controls = !b;
+  if (!b) $('clipBtn').disabled = !$('src').videoWidth;
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && cancel) cancel('Stopped because you left this tab. Keep it open while recording.');
+});
+
+/* ---------- Animated video ---------- */
+const THEMES = [['#0b0c2a','#3b1d78','#8b7bff'],['#35103f','#d4486b','#ffc15e'],['#03263a','#0b7a8a','#7ff0d4']];
+
+function scenes(){
+  const list = [$('title').value, ...$('script').value.split('\n')].map(s => s.trim()).filter(Boolean);
+  return list.map(text => ({text, dur: Math.max(2.5, text.split(/\s+/).length * 0.42 + 1.2)}));
+}
+
+function drawScene(list, time){
+  const c = $('makeCanvas'), x = c.getContext('2d'), W = c.width, H = c.height;
+  const [a,b,glow] = THEMES[$('theme').value];
+  const g = x.createLinearGradient(0,0,W,H); g.addColorStop(0,a); g.addColorStop(1,b);
+  x.globalAlpha = 1; x.fillStyle = g; x.fillRect(0,0,W,H);
+  // objects floating upward
+  for (let i = 0; i < 36; i++){
+    const r = 4 + (i*37 % 23);
+    const px = (i*197.3 % W) + Math.sin(time*0.7 + i)*30;
+    const py = H + r - ((i*331.7 + time*(20 + r*3)) % (H + 2*r));
+    x.globalAlpha = 0.12 + (i%5)*0.06; x.fillStyle = glow;
+    x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+  }
+  let i = 0, t = time;
+  while (i < list.length - 1 && t >= list[i].dur){ t -= list[i].dur; i++; }
+  const s = list[i];
+  if (s){
+    const {lines, size} = fitText(x, s.text, W*0.82, H*0.6, i === 0 ? 92 : 72);
+    const lh = size*1.25, top = H/2 - (lines.length-1)*lh/2;
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 14;
+    const fade = Math.min(1, Math.max(0, (s.dur - t)/0.35));
+    let n = 0; const total = lines.join(' ').split(' ').length;
+    const step = Math.min(0.14, s.dur*0.5/total);
+    lines.forEach((line, row) => {
+      const words = line.split(' ');
+      let px = W/2 - x.measureText(line).width/2;
+      words.forEach(word => {
+        const p = Math.min(1, Math.max(0, (t - n++*step)/0.35));
+        const ease = 1 - Math.pow(1-p, 3), w = x.measureText(word).width;
+        x.globalAlpha = ease*fade; x.fillStyle = i === 0 ? glow : '#fff';
+        x.fillText(word, px + w/2, top + row*lh + (1-ease)*60 + Math.sin(time*2 + n*0.6)*4);
+        px += w + x.measureText(' ').width;
+      });
+    });
+    x.shadowBlur = 0;
+  }
+  const length = list.reduce((n,s) => n + s.dur, 0);
+  x.globalAlpha = 1; x.fillStyle = glow; x.fillRect(0, H-10, W*Math.min(1, time/length), 10);
+}
+
+let previewId = 0;
+function stopPreview(){ cancelAnimationFrame(previewId); }
+
+function resize(){
+  const v = $('shape').value === 'v';
+  $('makeCanvas').width = v ? 720 : 1280; $('makeCanvas').height = v ? 1280 : 720;
+}
+function still(){ stopPreview(); resize(); drawScene(scenes(), 1.8); }
+['title','script','shape','theme'].forEach(id => $(id).addEventListener('input', still));
+
+$('preview').onclick = () => {
+  stopPreview(); resize();
+  const list = scenes(), length = list.reduce((n,s) => n + s.dur, 0), t0 = performance.now();
+  const tick = now => {
+    const t = Math.max(0, (now - t0)/1000);
+    drawScene(list, Math.min(t, length - 0.4));
+    if (t < length) previewId = requestAnimationFrame(tick);
+  };
+  previewId = requestAnimationFrame(tick);
+};
+
+$('makeBtn').onclick = async () => {
+  stopPreview(); resize();
+  const list = scenes();
+  if (!list.length){ $('makeStatus').textContent = 'Type a topic or script first.'; return; }
+  const file = $('voice').files[0], ac = file ? getAudio() : null;
+  setBusy(true);
+  let source = null, recorder = null;
+  try {
+    let length = list.reduce((n,s) => n + s.dur, 0), dest = null;
+    if (file){
+      $('makeStatus').textContent = 'Loading audio...';
+      const data = await file.arrayBuffer();
+      const buffer = await new Promise((res, rej) => ac.decodeAudioData(data, res, () => rej(new Error('Could not read that audio file.'))));
+      // a voice-over longer than the scenes stretches them to match
+      if (buffer.duration > length){
+        const k = buffer.duration/length; list.forEach(s => s.dur *= k); length = buffer.duration;
+      }
+      dest = ac.createMediaStreamDestination();
+      source = ac.createBufferSource(); source.buffer = buffer;
+      source.connect(dest); source.connect(ac.destination);
+    }
+    drawScene(list, 0);
+    recorder = startRecorder($('makeCanvas'), dest && dest.stream);
+    if (source) source.start();
+    await new Promise((res, rej) => {
+      const t0 = performance.now(); let id;
+      cancel = msg => { cancelAnimationFrame(id); rej(new Error(msg)); };
+      const tick = now => {
+        const t = Math.max(0, (now - t0)/1000);
+        drawScene(list, Math.min(t, length - 0.01));
+        $('makeStatus').textContent = `Recording ${Math.min(t,length).toFixed(0)} of ${length.toFixed(0)} seconds. Keep this tab open.`;
+        if (t < length) id = requestAnimationFrame(tick); else res();
+      };
+      id = requestAnimationFrame(tick);
+    });
+    showResult($('makeResult'), await recorder.stop(), 'animated-video');
+    $('makeStatus').textContent = 'Your video is ready.';
+  } catch (e){
+    if (recorder) recorder.stop();
+    $('makeStatus').textContent = e.message;
+  } finally {
+    if (source) try { source.stop(); } catch (e){}
+    cancel = null; setBusy(false);
+  }
+};
+
+/* ---------- Clipper ---------- */
+const video = $('src'), small = document.createElement('canvas');
+let videoNode = null, videoDest = null;
+small.width = 36; small.height = 64;
+
+function cover(ctx, W, H, pos){
+  const vw = video.videoWidth, vh = video.videoHeight, s = Math.max(W/vw, H/vh);
+  ctx.drawImage(video, (W - vw*s)*pos, (H - vh*s)/2, vw*s, vh*s);
+}
+
+function drawClip(){
+  const c = $('clipCanvas'), x = c.getContext('2d'), W = c.width, H = c.height;
+  x.fillStyle = '#000'; x.fillRect(0,0,W,H);
+  if (video.videoWidth){
+    if ($('layout').value === 'fill') cover(x, W, H, +$('pos').value);
+    else {
+      cover(small.getContext('2d'), small.width, small.height, 0.5);
+      x.drawImage(small, 0, 0, W, H);
+      x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(0,0,W,H);
+      const s = Math.min(W/video.videoWidth, H/video.videoHeight), w = video.videoWidth*s, h = video.videoHeight*s;
+      x.drawImage(video, (W-w)/2, (H-h)/2, w, h);
+    }
+  }
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+  const label = (text, cy, maxH, size) => {
+    if (!text.trim()) return;
+    const f = fitText(x, text.trim(), W*0.86, maxH, size);
+    f.lines.forEach((l, i) => {
+      const y = cy + (i - (f.lines.length-1)/2)*f.size*1.2;
+      x.lineWidth = f.size*0.2; x.strokeStyle = '#000'; x.strokeText(l, W/2, y);
+      x.fillStyle = '#fff'; x.fillText(l, W/2, y);
+    });
+  };
+  label($('hook').value, H*0.15, H*0.18, 64);
+  label($('credit').value, H*0.92, H*0.06, 34);
+}
+
+['layout','pos','hook','credit'].forEach(id => $(id).addEventListener('input', () => { if (!busy) drawClip(); }));
+['loadeddata','seeked','timeupdate'].forEach(ev => video.addEventListener(ev, () => { if (!busy) drawClip(); }));
+
+$('file').onchange = () => {
+  const f = $('file').files[0]; if (!f) return;
+  URL.revokeObjectURL(video.src);
+  $('clipBtn').disabled = true; $('clipStatus').textContent = 'Loading video...';
+  video.src = URL.createObjectURL(f); video.hidden = false; video.load();
+};
+video.addEventListener('loadedmetadata', () => {
+  $('start').value = 0; $('end').value = Math.min(30, Math.floor(video.duration*10)/10);
+  $('clipBtn').disabled = false; $('clipStatus').textContent = 'Pick the start and end of your clip.';
+});
+video.addEventListener('error', () => { $('clipStatus').textContent = 'This video could not be opened. Try an MP4 file.'; });
+$('setStart').onclick = () => $('start').value = video.currentTime.toFixed(1);
+$('setEnd').onclick = () => $('end').value = video.currentTime.toFixed(1);
+
+function seek(t){
+  return new Promise(res => {
+    if (Math.abs(video.currentTime - t) < 0.01 && !video.seeking) return res();
+    video.addEventListener('seeked', res, {once:true}); video.currentTime = t;
+  });
+}
+
+$('clipBtn').onclick = async () => {
+  const a = +$('start').value, b = Math.min(+$('end').value, video.duration);
+  if (!(a >= 0 && b - a >= 1)){ $('clipStatus').textContent = 'The end must be at least 1 second after the start.'; return; }
+  const ac = getAudio();
+  const prime = video.play(); // iPad only allows sound if play starts on a tap
+  setBusy(true);
+  let recorder = null;
+  try {
+    await prime.catch(() => {}); video.pause();
+    if (!videoNode){
+      videoNode = ac.createMediaElementSource(video);
+      videoDest = ac.createMediaStreamDestination();
+      videoNode.connect(videoDest); videoNode.connect(ac.destination);
+    }
+    await seek(a); drawClip();
+    await video.play();
+    recorder = startRecorder($('clipCanvas'), videoDest.stream);
+    await new Promise((res, rej) => {
+      let id;
+      cancel = msg => { cancelAnimationFrame(id); rej(new Error(msg)); };
+      const tick = () => {
+        drawClip();
+        $('clipStatus').textContent = `Recording ${Math.max(0, video.currentTime - a).toFixed(0)} of ${(b-a).toFixed(0)} seconds. Keep this tab open.`;
+        if (video.currentTime < b && !video.ended) id = requestAnimationFrame(tick); else res();
+      };
+      id = requestAnimationFrame(tick);
+    });
+    video.pause();
+    showResult($('clipResult'), await recorder.stop(), 'clip');
+    $('clipStatus').textContent = 'Your clip is ready.';
+  } catch (e){
+    video.pause(); if (recorder) recorder.stop();
+    $('clipStatus').textContent = e.message;
+  } finally { cancel = null; setBusy(false); }
+};
+
+still(); drawClip();
+</script>
+</body>
+</html>
