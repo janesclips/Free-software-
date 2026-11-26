@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Antigravity Studio</title>
+<style>
+:root{--bg:#0f1020;--panel:#191b33;--ink:#f2f3ff;--mute:#a4a8cc;--accent:#8b7bff;--line:#30345c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,system-ui,sans-serif}
+main{max-width:1000px;margin:auto;padding:16px}
+h1{margin:4px 0 12px;font-size:26px}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 16px;border-radius:10px;cursor:pointer;text-decoration:none;display:inline-block}
+button.on,button.go,.btn{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+label{display:block;color:var(--mute);font-size:14px;margin:10px 0 4px}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+input[type=range]{padding:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+canvas,video{display:block;max-width:100%;max-height:70vh;margin:auto;border-radius:10px;background:#000}
+#src{width:100%;max-height:30vh;margin-top:10px}
+.status{color:var(--mute);min-height:1.5em;margin:10px 0}
+.player{aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.player iframe{width:100%;height:100%;border:0}
+ol{padding-left:20px}li{margin-bottom:12px;overflow-wrap:anywhere}
+a{color:#b9afff}a.btn{color:#fff}
+summary{cursor:pointer;color:var(--mute);margin-top:12px}
+pre{white-space:pre-wrap;font:inherit;font-size:14px}
+.result video{max-height:40vh;margin-bottom:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Antigravity Studio</h1>
+<nav>
+  <button id="tabMake" class="on">Animated video</button>
+  <button id="tabClip">Clipper</button>
+  <button id="tabLink">YouTube moments</button>
+</nav>
+
+<section id="make" class="grid">
+  <div class="panel">
+    <label for="key">Gemini API key (saved only on this device)</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Paste your key once">
+    <p class="status"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key from Google AI Studio</a></p>
+    <label for="prompt">What do you want in your video?</label>
+    <textarea id="prompt" rows="6" placeholder="A funny cartoon explaining how rain is made, for beginners"></textarea>
+    <label for="length">Length (approximate)</label>
+    <select id="length"><option value="1">1 minute</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option></select>
+    <label for="speaker">Voice</label>
+    <select id="speaker"><option value="Kore">Kore (firm)</option><option value="Puck">Puck (upbeat)</option><option value="Charon">Charon (informative)</option><option value="Aoede">Aoede (breezy)</option></select>
+    <label for="shape">Shape</label>
+    <select id="shape"><option value="v">Vertical 9:16 (Shorts, Reels)</option><option value="h">Wide 16:9 (YouTube)</option></select>
+    <label for="theme">Night and space colours</label>
+    <select id="theme"><option value="0">Space</option><option value="1">Sunset</option><option value="2">Ocean</option></select>
+    <div class="row"><button id="makeBtn" class="go">Make my video</button><button id="stopBtn" hidden>Stop</button></div>
+    <details><summary>Script the AI wrote</summary><pre id="scriptOut">Nothing yet.</pre></details>
+  </div>
+  <div class="panel">
+    <canvas id="makeCanvas" width="720" height="1280"></canvas>
+    <div class="status" id="makeStatus" role="status"></div>
+    <div class="result" id="makeResult"></div>
+  </div>
+</section>
+
+<section id="clip" class="grid" hidden>
+  <div class="panel">
+    <label for="file">Video file from your iPad (use only videos you have permission to use)</label>
+    <input id="file" type="file" accept="video/*">
+    <video id="src" controls playsinline preload="auto" hidden></video>
+    <div class="row"><button id="setStart">Set start here</button><button id="setEnd">Set end here</button></div>
+    <div class="grid">
+      <div><label for="start">Start (seconds)</label><input id="start" type="number" min="0" step="0.1" value="0"></div>
+      <div><label for="end">End (seconds)</label><input id="end" type="number" min="0" step="0.1" value="30"></div>
+    </div>
+    <label for="layout">Vertical layout</label>
+    <select id="layout"><option value="fill">Fill screen (crops sides)</option><option value="fit">Whole picture, blurred background</option></select>
+    <label for="pos">Crop position, left to right</label>
+    <input id="pos" type="range" min="0" max="1" step="0.01" value="0.5">
+    <label for="hook">Headline at top</label>
+    <input id="hook" placeholder="Wait for it...">
+    <label for="credit">Credit line</label>
+    <input id="credit" placeholder="Credit: @creatorname">
+    <div class="row"><button id="clipBtn" class="go" disabled>Create clip</button></div>
+  </div>
+  <div class="panel">
+    <canvas id="clipCanvas" width="720" height="1280"></canvas>
+    <div class="status" id="clipStatus" role="status"></div>
+    <div class="result" id="clipResult"></div>
+  </div>
+</section>
+
+<section id="link" class="grid" hidden>
+  <div class="panel">
+    <label for="yt">YouTube link (video or live stream)</label>
+    <input id="yt" type="url" placeholder="https://youtube.com/watch?v=...">
+    <div class="row"><button id="ytLoad" class="go">Load</button></div>
+    <div class="player" style="margin-top:12px"><div id="player"></div></div>
+    <div class="row"><button id="markStart" disabled>Mark start</button><button id="markEnd" disabled>Mark end</button><button id="last30" disabled>Save last 30s</button></div>
+    <div class="status" id="ytStatus" role="status">Nothing is downloaded. This saves times and links only.</div>
+  </div>
+  <div class="panel">
+    <strong>Saved moments</strong>
+    <ol id="moments"></ol>
+    <div class="row"><button id="copyBtn">Copy list</button><button id="clearBtn">Clear</button></div>
+    <div class="status" id="copyStatus" role="status"></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let busy = false, cancel = null, audioCtx = null;
+
+function tab(name){
+  if (busy) return;
+  for (const [id, btn] of [['make','tabMake'],['clip','tabClip'],['link','tabLink']]){
+    $(id).hidden = name !== id; $(btn).classList.toggle('on', name === id);
+  }
+  if (name !== 'clip') $('src').pause();
+  if (name !== 'link' && player && player.pauseVideo) player.pauseVideo();
+}
+$('tabMake').onclick = () => tab('make');
+$('tabClip').onclick = () => tab('clip');
+$('tabLink').onclick = () => tab('link');
+
+function getAudio(){
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume();
+  return audioCtx;
+}
+
+function wrap(ctx, text, maxW){
+  const lines = []; let line = '';
+  for (let word of text.split(/\s+/)){
+    // break words that are wider than the frame
+    while (ctx.measureText(word).width > maxW && word.length > 1){
+      let n = word.length - 1;
+      while (n > 1 && ctx.measureText(word.slice(0,n)).width > maxW) n--;
+      if (line){ lines.push(line); line = ''; }
+      lines.push(word.slice(0,n)); word = word.slice(n);
+    }
+    const next = line ? line + ' ' + word : word;
+    if (ctx.measureText(next).width > maxW && line){ lines.push(line); line = word; }
+    else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function fitText(ctx, text, maxW, maxH, size){
+  let lines;
+  do {
+    ctx.font = `800 ${size}px -apple-system,system-ui,sans-serif`;
+    lines = wrap(ctx, text, maxW);
+    size -= 4;
+  } while (lines.length * (size+4) * 1.25 > maxH && size > 16);
+  return {lines, size: size + 4};
+}
+
+/* ---------- Recording ---------- */
+function startRecorder(canvas, audioStream, bitrate = 6000000){
+  if (!window.MediaRecorder || !canvas.captureStream) throw new Error('This browser cannot record video. Update iPadOS and use Safari.');
+  const stream = canvas.captureStream(30);
+  if (audioStream) audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const type = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm']
+    .find(t => MediaRecorder.isTypeSupported(t));
+  const rec = new MediaRecorder(stream, {mimeType: type, videoBitsPerSecond: bitrate});
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const done = new Promise((res, rej) => {
+    rec.onstop = () => res(new Blob(chunks, {type: rec.mimeType || type}));
+    rec.onerror = () => rej(new Error('Recording failed.'));
+  });
+  rec.start(1000);
+  return {stop(){ if (rec.state !== 'inactive') rec.stop(); stream.getVideoTracks().forEach(t => t.stop()); return done; }};
+}
+
+function showResult(box, blob, name){
+  box.querySelectorAll('video').forEach(v => URL.revokeObjectURL(v.src));
+  box.textContent = '';
+  const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+  const url = URL.createObjectURL(blob);
+  const v = Object.assign(document.createElement('video'), {src:url, controls:true, playsInline:true});
+  const a = Object.assign(document.createElement('a'), {href:url, download:`${name}.${ext}`, textContent:'Download video', className:'btn'});
+  const row = document.createElement('div'); row.className = 'row'; row.append(a);
+  const file = new File([blob], `${name}.${ext}`, {type: blob.type.split(';')[0]});
+  if (navigator.canShare && navigator.canShare({files:[file]})){
+    const s = document.createElement('button'); s.textContent = 'Share / Save';
+    s.onclick = () => navigator.share({files:[file]}).catch(() => {});
+    row.append(s);
+  }
+  box.append(v, row);
+}
+
+function setBusy(b){
+  busy = b;
+  document.querySelectorAll('input,textarea,select,button').forEach(el => el.disabled = b);
+  $('src').controls = !b;
+  if (!b){ $('clipBtn').disabled = !$('src').videoWidth; marks(!!(player && player.getCurrentTime)); }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && cancel) cancel('Stopped because you left this tab. Keep it open while recording.');
+});
+
+/* ---------- Animated video ---------- */
+const THEMES = [['#0b0c2a','#3b1d78','#8b7bff'],['#35103f','#d4486b','#ffc15e'],['#03263a','#0b7a8a','#7ff0d4']];
+
+const store = {
+  get(){ try { return localStorage.getItem('geminiKey') || ''; } catch (e){ return ''; } },
+  set(v){ try { localStorage.setItem('geminiKey', v); } catch (e){} }
+};
+$('key').value = store.get();
+$('key').addEventListener('change', () => store.set($('key').value.trim()));
+
+const TEXT_MODELS = ['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-2.5-flash'];
+const VOICE_MODELS = ['gemini-3.1-flash-tts-preview','gemini-2.5-flash-preview-tts'];
+let abort = null;
+
+const sleep = (ms, signal) => new Promise((res, rej) => {
+  if (signal.aborted) return rej(new Error('Stopped.'));
+  const id = setTimeout(res, ms);
+  signal.addEventListener('abort', () => { clearTimeout(id); rej(new Error('Stopped.')); }, {once:true});
+});
+
+// Tries each model in turn; waits and retries when Google asks us to slow down.
+async function gemini(models, body, signal){
+  let problem = 'No answer from Google.';
+  for (const model of models){
+    for (let attempt = 0; attempt < 3; attempt++){
+      let r, data;
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method:'POST', signal, headers:{'Content-Type':'application/json','x-goog-api-key':$('key').value.trim()}, body:JSON.stringify(body)});
+        data = await r.json();
+      } catch (e){
+        if (signal.aborted) throw new Error('Stopped.');
+        problem = 'Could not reach Google. Check your internet.'; break;
+      }
+      if (r.ok){
+        const parts = data.candidates?.[0]?.content?.parts;
+        if (parts?.length) return parts;
+        problem = 'Google returned nothing. Try a different prompt.'; break;
+      }
+      problem = data.error?.message || `Google error ${r.status}`;
+      if (r.status === 401 || r.status === 403 || /api key/i.test(problem)) throw new Error('Google rejected the key: ' + problem);
+      if (![429,500,503].includes(r.status) || attempt === 2) break;
+      const delay = data.error?.details?.find(d => d.retryDelay)?.retryDelay;
+      const wait = parseFloat(delay) || 20 * (attempt+1);
+      if (wait > 90) break;
+      $('makeStatus').textContent = `Google is busy or your limit was reached. Retrying in ${Math.ceil(wait)} seconds...`;
+      await sleep(wait*1000, signal);
+    }
+  }
+  throw new Error(problem);
+}
+
+const PLACES = ['outdoors','city','room','classroom','lab','space','underwater','night'];
+const ACTIONS = ['talk','idle','walk','run','wave','point','jump','think','cheer','scared','dance','float','fall'];
+const MOODS = ['happy','neutral','sad','surprised','angry','scared'];
+const MOTIONS = ['still','bounce','fall','rise','fly','spin','grow','shrink','orbit','shake','pulse'];
+const SPOTS = ['left','center','right'];
+const PROP_SPOTS = ['top','left','center','right','ground'];
+const pick = (value, list, other) => list.includes(value) ? value : other;
+
+function cleanScene(s){
+  const cast = (Array.isArray(s.characters) ? s.characters : []).filter(Boolean).slice(0,3).map((c,i) => ({
+    who: [0,1,2,3].includes(c.who) ? c.who : i, position: pick(c.position, SPOTS, SPOTS[i]),
+    action: pick(c.action, ACTIONS, 'talk'), mood: pick(c.mood, MOODS, 'happy')}));
+  // two characters must never stand on the same spot
+  cast.forEach((c,i) => { if (cast.slice(0,i).some(o => o.position === c.position)) c.position = SPOTS.find(q => !cast.some(o => o.position === q)); });
+  const props = (Array.isArray(s.props) ? s.props : []).filter(o => o && typeof o.emoji === 'string').slice(0,4).map(o => ({
+    emoji: Array.from(o.emoji).slice(0,8).join(''), position: pick(o.position, PROP_SPOTS, 'top'), motion: pick(o.motion, MOTIONS, 'bounce')}));
+  return {narration: s.narration.trim(), text: String(s.caption || '').trim().slice(0,90),
+    place: pick(s.background, PLACES, 'outdoors'), cast, props};
+}
+
+async function writeScript(prompt, minutes, signal){
+  const words = minutes * 145;
+  const parts = await gemini(TEXT_MODELS, {
+    contents:[{parts:[{text:
+`You are the writer and animation director of a narrated cartoon.
+Request: ${prompt}
+Total narration: about ${words} words, split into short scenes of 10 to 22 words each, so the picture changes often.
+Be factually accurate. Write in the language the request asks for, otherwise the language of the request.
+Every scene must SHOW what the narration says: choose the place, what the characters do, and objects that move.
+Return only JSON:
+{"title": string, "scenes": [{"narration": string, "caption": string, "background": string,
+ "characters": [{"who": number, "position": string, "action": string, "mood": string}],
+ "props": [{"emoji": string, "position": string, "motion": string}]}]}
+background: one of ${PLACES.join(', ')}
+who: 0 to 3, the same number is always the same person. The first character listed in a scene is the one talking.
+characters: 0 to 3 per scene, each in a different position (${SPOTS.join(', ')})
+action: one of ${ACTIONS.join(', ')}
+mood: one of ${MOODS.join(', ')}
+props: 1 to 4 per scene, one emoji each, showing the things being talked about
+prop position: one of ${PROP_SPOTS.join(', ')}
+motion: one of ${MOTIONS.join(', ')}
+caption: at most 8 words.`}]}],
+    generationConfig:{responseMimeType:'application/json'}
+  }, signal);
+  let data;
+  try { data = JSON.parse(parts.map(p => p.text || '').join('').replace(/^```(json)?|```$/g,'').trim()); }
+  catch (e){ throw new Error('The script came back incomplete. Tap Make my video again.'); }
+  const list = (data.scenes || []).filter(s => s && typeof s.narration === 'string' && s.narration.trim()).map(cleanScene);
+  if (!list.length) throw new Error('No script was written. Try a clearer prompt.');
+  return {title:String(data.title || prompt).slice(0,120), list};
+}
+
+// Gemini returns 16-bit mono audio, either raw or inside a WAV file.
+function pcmFrom(base64, mime){
+  const bin = atob(base64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const view = new DataView(bytes.buffer);
+  let rate = +(/rate=(\d+)/.exec(mime || '')?.[1] || 24000), start = 0, size = bytes.length;
+  if (bin.startsWith('RIFF')){
+    for (let at = 12; at + 8 <= bytes.length;){
+      const id = bin.slice(at, at+4), len = view.getUint32(at+4, true);
+      if (id === 'fmt ') rate = view.getUint32(at+12, true);
+      if (id === 'data'){ start = at+8; size = Math.min(len, bytes.length - start); break; }
+      at += 8 + len + (len & 1);
+    }
+  }
+  const out = new Float32Array(Math.floor(size/2));
+  for (let i = 0; i < out.length; i++) out[i] = view.getInt16(start + i*2, true)/32768;
+  return {samples:out, rate};
+}
+
+// Place a scene change at the quietest moment near where we expect it.
+function quietest(samples, rate, guess, lo, hi){
+  const win = Math.floor(rate*0.15);
+  let best = guess, score = Infinity;
+  for (let t = Math.max(lo, guess - 2); t <= Math.min(hi, guess + 2); t += 0.05){
+    const c = Math.floor(t*rate); let sum = 0, n = 0;
+    for (let i = Math.max(0, c-win); i < Math.min(samples.length, c+win); i += 4){ sum += samples[i]**2; n++; }
+    const v = sum/(n || 1) + Math.abs(t-guess)*1e-5;
+    if (v < score){ score = v; best = t; }
+  }
+  return best;
+}
+
+// Narrate several scenes per request so long videos stay within request limits.
+async function narrate(ac, video, speaker, signal){
+  const groups = [[]];
+  let chars = 0;
+  for (const s of video.list){
+    if (chars + s.narration.length > 2200 && chars){ groups.push([]); chars = 0; }
+    groups[groups.length-1].push(s); chars += s.narration.length;
+  }
+  for (let g = 0; g < groups.length; g++){
+    const group = groups[g];
+    video.audio = video.audio || [];
+    if (video.audio[g]) continue;
+    $('makeStatus').textContent = `Recording the voice, part ${g+1} of ${groups.length}...`;
+    const parts = await gemini(VOICE_MODELS, {
+      contents:[{parts:[{text:'Read this narration aloud in a clear, lively voice:\n\n' + group.map(s => s.narration).join('\n\n')}]}],
+      generationConfig:{responseModalities:['AUDIO'], speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:speaker}}}}
+    }, signal);
+    const audio = parts.find(p => p.inlineData)?.inlineData;
+    if (!audio) throw new Error('No voice came back. Tap Make my video again.');
+    const {samples, rate} = pcmFrom(audio.data, audio.mimeType);
+    if (!samples.length) throw new Error('The voice came back empty. Tap Make my video again.');
+    const buffer = ac.createBuffer(1, samples.length, rate);
+    buffer.getChannelData(0).set(samples);
+    const total = group.reduce((n,s) => n + s.narration.length, 0);
+    let done = 0, prev = 0;
+    group.forEach((s, i) => {
+      done += s.narration.length;
+      const end = i === group.length-1 ? buffer.duration
+        : quietest(samples, rate, buffer.duration*done/total, prev + 0.5, buffer.duration);
+      s.dur = Math.max(0.1, end - prev); prev += s.dur;
+    });
+    video.audio[g] = buffer;
+  }
+}
+
+const LOOKS = [
+  {skin:'#f2b98f', hair:'#3a2418', shirt:'#ff6b57', legs:'#27345c', style:0},
+  {skin:'#8d5a3b', hair:'#17100d', shirt:'#25b6a6', legs:'#37304f', style:1},
+  {skin:'#ffd7b5', hair:'#d9822b', shirt:'#8b6cff', legs:'#2c4a45', style:2},
+  {skin:'#c88a5f', hair:'#454a55', shirt:'#ffbe3d', legs:'#4a3140', style:3}
+];
+const INK = '#231c2b';
+const smooth = v => { v = Math.max(0, Math.min(1, v)); return v*v*(3 - 2*v); };
+
+function ball(x, cx, cy, r, colour){ x.fillStyle = colour; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill(); }
+function box(x, bx, by, w, h, colour){ x.fillStyle = colour; x.fillRect(bx, by, w, h); }
+function stroke(x, points, width, colour){
+  x.strokeStyle = colour; x.lineWidth = width; x.lineCap = 'round'; x.lineJoin = 'round';
+  x.beginPath(); points.forEach((p,i) => i ? x.lineTo(p[0],p[1]) : x.moveTo(p[0],p[1])); x.stroke();
+}
+
+function backdrop(x, W, H, place, time, theme){
+  const [a,b,glow] = THEMES[theme], G = H*0.78, m = Math.min(W,H);
+  const sky = (top, bottom) => { const g = x.createLinearGradient(0,0,0,H); g.addColorStop(0,top); g.addColorStop(1,bottom); box(x,0,0,W,H,g); };
+  const cloud = (cx, cy, r) => { [[0,0,1],[0.9,0.2,0.75],[-0.9,0.25,0.7]].forEach(c => ball(x, cx+c[0]*r, cy+c[1]*r, c[2]*r, 'rgba(255,255,255,.9)')); };
+  if (place === 'space' || place === 'night'){
+    sky(a, b);
+    for (let i = 0; i < 70; i++){
+      x.globalAlpha = 0.4 + 0.5*Math.abs(Math.sin(time + i));
+      ball(x, i*197.3 % W, i*131.7 % (place === 'night' ? G : H), 1.5 + i%3, '#fff');
+    }
+    x.globalAlpha = 1;
+    if (place === 'night'){ ball(x, W*0.82, H*0.13, m*0.08, '#fff3c4'); box(x,0,G,W,H-G,'#182b33'); }
+    else { ball(x, W*0.5, H + m*0.75, m*0.98, '#2f7fd0'); ball(x, W*0.3, H*0.97, m*0.13, '#3fae6a'); ball(x, W*0.82, H*0.14, m*0.07, glow); }
+  } else if (place === 'underwater'){
+    sky('#35c4d9', '#06395c'); box(x,0,G,W,H-G,'#d8b877');
+    for (let i = 0; i < 9; i++){
+      const px = (i + 0.5)*W/9, sway = Math.sin(time*1.3 + i)*m*0.03;
+      stroke(x, [[px,G+10],[px+sway*0.5,G-m*0.07],[px+sway,G-m*(0.12 + (i%3)*0.04)]], m*0.018, '#1f8a63');
+    }
+    for (let i = 0; i < 18; i++) ball(x, i*211 % W, H - ((i*137 + time*70) % H), 4 + i%6, 'rgba(255,255,255,.35)');
+  } else if (place === 'room' || place === 'classroom' || place === 'lab'){
+    const wall = {room:'#f4d9b8', classroom:'#dbe8c9', lab:'#cfe3ee'}[place];
+    box(x,0,0,W,G,wall); box(x,0,G,W,H-G,place === 'lab' ? '#8195a6' : '#a9744f');
+    box(x,0,G,W,m*0.015,'rgba(0,0,0,.18)');
+    if (place === 'room'){
+      const w = m*0.34; box(x,W*0.08,H*0.16,w,w,'#fff'); box(x,W*0.08+12,H*0.16+12,w-24,w-24,'#9fdcf5');
+      cloud(W*0.08 + w*0.5 + Math.sin(time*0.4)*w*0.15, H*0.16 + w*0.45, w*0.12);
+      box(x,W*0.74,H*0.22,m*0.18,m*0.22,'#c4533f'); box(x,W*0.74+10,H*0.22+10,m*0.18-20,m*0.22-20,'#ffe9a8');
+    } else if (place === 'classroom'){
+      box(x,W*0.1,H*0.13,W*0.8,H*0.27,'#8a5a36'); box(x,W*0.1+14,H*0.13+14,W*0.8-28,H*0.27-28,'#24533f');
+      for (let i = 0; i < 3; i++) stroke(x, [[W*0.18,H*(0.19+i*0.06)],[W*(0.45 + i*0.1),H*(0.19+i*0.06)]], 5, 'rgba(255,255,255,.55)');
+    } else {
+      box(x,W*0.06,H*0.34,W*0.88,m*0.02,'#566879');
+      ['#ff7b72','#6ee7b7','#a78bfa','#fcd34d','#60a5fa'].forEach((colour,i) => {
+        const px = W*(0.13 + i*0.17), s2 = m*0.075, y = H*0.34;
+        box(x,px,y-s2,s2*0.7,s2,'rgba(255,255,255,.7)'); box(x,px,y-s2*0.6,s2*0.7,s2*0.6,colour);
+        ball(x,px+s2*0.35,y-s2*0.7-((time*40+i*23)%(s2*1.5)),5,colour);
+      });
+    }
+  } else {
+    sky('#79c8ff', '#dff3ff'); ball(x, W*0.82, H*0.12, m*0.08, '#ffd84d');
+    for (let i = 0; i < 3; i++) cloud(((i*0.4*W + time*(18 + i*7)) % (W + m*0.4)) - m*0.2, H*(0.12 + i*0.09), m*0.055);
+    if (place === 'city'){
+      for (let i = 0; i < 7; i++){
+        const bw = W/7, bh = H*(0.18 + ((i*37)%23)/100);
+        box(x,i*bw+4,G-bh,bw-8,bh,['#6673a8','#8a6fa8','#4f8296'][i%3]);
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 2; c++) box(x,i*bw+bw*(0.22+c*0.36),G-bh+20+r*bh*0.17,bw*0.2,bh*0.07,'#ffe89a');
+      }
+      box(x,0,G,W,H-G,'#5b5f6e'); for (let i = 0; i < 8; i++) box(x,i*W/8,H*0.86,W/16,8,'#fff');
+    } else {
+      ball(x, W*0.2, G+m*0.55, m*0.72, '#7fcf6a'); ball(x, W*0.85, G+m*0.7, m*0.85, '#6bbd5c'); box(x,0,G,W,H-G,'#55a94c');
+    }
+  }
+}
+
+function person(x, c, px, ground, size, t, time, mouth, facing){
+  const L = LOOKS[c.who], u = size/100, act = c.action, mood = c.mood;
+  let dx = 0, dy = 0, tilt = 0, swing = 0, bounce = Math.sin(time*2.4 + c.who)*0.6;
+  // arms are [elbow, hand] for left and right
+  let left = [[-19,-43],[-21,-30]], right = [[19,-43],[21,-30]];
+  const walking = act === 'walk' || act === 'run';
+  if (walking){
+    const k = smooth(t/(act === 'run' ? 1 : 1.8));
+    dx = -facing*(1-k)*size*1.3;
+    if (k < 1){ swing = Math.sin(time*(act === 'run' ? 18 : 10)); left = [[-17,-44],[-17 + swing*14,-33]]; right = [[17,-44],[17 + swing*14,-33]]; bounce = Math.abs(swing)*2; }
+  }
+  if (act === 'talk'){ right = [[22,-44],[31 + Math.sin(time*3)*3,-50 + Math.sin(time*5)*4]]; }
+  if (act === 'wave'){ right = [[26,-60],[30 + Math.sin(time*9)*8,-79]]; }
+  if (act === 'point'){ const arm = [[24,-52],[41,-61]]; if (facing > 0) right = arm; else left = arm.map(p => [-p[0],p[1]]); }
+  if (act === 'think'){ right = [[24,-42],[7,-55]]; }
+  if (act === 'cheer' || act === 'jump'){ left = [[-25,-65],[-27,-84]]; right = [[25,-65],[27,-84]]; dy = -Math.abs(Math.sin(time*(act === 'jump' ? 5 : 3.5)))*(act === 'jump' ? 28 : 8); }
+  if (act === 'scared'){ dx = Math.sin(time*40)*1.6*u; left = [[-23,-48],[-14,-60]]; right = [[23,-48],[14,-60]]; }
+  if (act === 'dance'){ const w = Math.sin(time*6); dx = w*6*u; tilt = w*0.12; left = [[-25,-55],[-30,-55 - w*22]]; right = [[25,-55],[30,-55 + w*22]]; }
+  if (act === 'float'){ dy = -24 + Math.sin(time*2)*7; tilt = Math.sin(time*1.3)*0.22; left = [[-25,-51],[-37,-58]]; right = [[25,-51],[37,-58]]; }
+  if (act === 'fall'){ const k = smooth(t/0.8); tilt = k*1.35*-facing; left = [[-25,-55],[-35,-68]]; right = [[25,-55],[35,-68]]; }
+
+  x.save();
+  x.translate(px + dx, ground);
+  x.scale(u, u);
+  x.fillStyle = 'rgba(0,0,0,.18)'; x.beginPath(); x.ellipse(0, 1, 22*Math.max(0.5, 1 + dy/60), 4, 0, 0, Math.PI*2); x.fill();
+  x.translate(0, dy); x.rotate(tilt);
+  // legs
+  [-1,1].forEach(side => {
+    const step = swing*side*12, lift = Math.max(0, swing*side)*6;
+    stroke(x, [[side*7,-30],[side*8 + step*0.5,-15 - lift*0.5],[side*9 + step,-3 - lift]], 8, L.legs);
+    stroke(x, [[side*9 + step,-3 - lift],[side*9 + step + (walking ? facing : side)*5,-3 - lift]], 7, INK);
+  });
+  x.translate(0, -bounce);
+  // body
+  x.fillStyle = L.shirt; x.beginPath(); x.moveTo(-13,-55); x.quadraticCurveTo(0,-61,13,-55); x.lineTo(15,-28); x.quadraticCurveTo(0,-24,-15,-28); x.closePath(); x.fill();
+  [[-1,left],[1,right]].forEach(([side,arm]) => {
+    stroke(x, [[side*11,-52],arm[0],arm[1]], 6.5, L.shirt);
+    ball(x, arm[1][0], arm[1][1], 4.3, L.skin);
+  });
+  // head
+  const hx = act === 'think' ? 2 : 0, hy = -77;
+  if (L.style === 1) ball(x, hx, hy-4, 24, L.hair);
+  if (L.style === 2){ box(x, hx-22, hy-6, 44, 28, L.hair); ball(x, hx, hy-5, 22, L.hair); }
+  ball(x, hx, hy, 20, L.skin);
+  x.fillStyle = L.hair; x.beginPath(); x.arc(hx, hy-3, 20.5, Math.PI*1.03, Math.PI*1.97);
+  x.quadraticCurveTo(hx + (L.style === 3 ? -4 : 6), hy-9, hx-20, hy-5); x.fill();
+  if (L.style === 0) [-8,2,12].forEach(o => ball(x, hx+o, hy-20, 7, L.hair));
+  if (L.style === 3) ball(x, hx, hy-25, 8, L.hair);
+  // face
+  const look = facing*1.5, blink = (time + c.who*1.3) % 3.6 < 0.13, wide = mood === 'surprised' || mood === 'scared';
+  [-1,1].forEach(side => {
+    const ex = hx + side*7.5, ey = hy-1;
+    if (blink) stroke(x, [[ex-3,ey],[ex+3,ey]], 1.6, INK);
+    else { ball(x, ex, ey, wide ? 5.4 : 4.4, '#fff'); ball(x, ex+look, ey+0.4, wide ? 2 : 2.5, INK); ball(x, ex+look+0.8, ey-0.5, 0.8, '#fff'); }
+    const inner = {angry:3, sad:-3, scared:-3, surprised:-2.5, neutral:0, happy:-0.5}[mood];
+    const up = wide ? 3 : 0;
+    stroke(x, [[ex-side*3.5, ey-8-up+inner],[ex+side*3.5, ey-8-up]], 1.8, INK);
+  });
+  const my = hy+10;
+  if (mouth > 0.08 || wide){
+    x.fillStyle = '#5a1f2e'; x.beginPath(); x.ellipse(hx, my, wide && mouth <= 0.08 ? 3.5 : 5, wide && mouth <= 0.08 ? 4.5 : 1.2 + mouth*5.5, 0, 0, Math.PI*2); x.fill();
+  } else {
+    const curve = mood === 'happy' ? 5 : mood === 'sad' ? -4 : mood === 'angry' ? -2 : 0;
+    x.strokeStyle = INK; x.lineWidth = 1.8; x.beginPath(); x.moveTo(hx-6, my-curve*0.3); x.quadraticCurveTo(hx, my+curve, hx+6, my-curve*0.3); x.stroke();
+  }
+  if (act === 'think'){ [[19,-97,2.5],[25,-105,4],[34,-115,7]].forEach((d,i) => { if (t > i*0.25) ball(x, d[0], d[1], d[2], '#fff'); }); }
+  x.restore();
+}
+
+function prop(x, W, H, o, index, t, time, dur){
+  const m = Math.min(W,H);
+  const spots = {top:[0.5,0.2], left:[0.2,0.38], center:[0.5,0.36], right:[0.8,0.38], ground:[0.5,0.74]};
+  let [fx,fy] = spots[o.position];
+  let px = W*fx, py = H*fy, size = m*0.15, angle = 0, scale = smooth(t/0.35);
+  // keep objects that share a spot apart
+  px += (index % 2 ? 1 : -1)*Math.ceil(index/2)*m*0.19;
+  const k = Math.max(0, Math.min(1, t/Math.max(1, dur - 0.4)));
+  if (o.motion === 'bounce') py -= Math.abs(Math.sin(time*3 + index))*m*0.07;
+  if (o.motion === 'fall') py = -size + (H*0.74 + size)*Math.min(1, (t/Math.min(1.8, dur*0.8))**2);
+  if (o.motion === 'rise') py = H*0.74 - (H*0.74 + size)*smooth(k);
+  if (o.motion === 'fly'){ px = -size + (W + 2*size)*k; py += Math.sin(time*4)*m*0.04; }
+  if (o.motion === 'spin') angle = time*2.5;
+  if (o.motion === 'grow') scale = 0.3 + 1.5*smooth(k);
+  if (o.motion === 'shrink') scale = 1.6 - 1.35*smooth(k);
+  if (o.motion === 'orbit'){ px = W/2 + Math.cos(time*1.8 + index*2)*W*0.36; py = H*0.38 + Math.sin(time*1.8 + index*2)*H*0.17; }
+  if (o.motion === 'shake'){ px += Math.sin(time*35)*m*0.015; angle = Math.sin(time*28)*0.15; }
+  if (o.motion === 'pulse') scale *= 1 + Math.sin(time*5)*0.18;
+  x.save(); x.translate(px, Math.max(-size, py)); x.rotate(angle); x.scale(scale, scale);
+  x.font = `${Math.round(size)}px -apple-system,system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = '#fff'; x.fillText(o.emoji, 0, 0); x.restore();
+}
+
+function drawScene(list, time, level = 0){
+  const c = $('makeCanvas'), x = c.getContext('2d'), W = c.width, H = c.height;
+  let i = 0, t = time;
+  while (i < list.length - 1 && t >= list[i].dur){ t -= list[i].dur; i++; }
+  const s = list[i];
+  if (!s) return;
+  const zoom = 1 + 0.05*Math.min(1, t/s.dur);
+  x.save(); x.globalAlpha = 1;
+  x.translate(W/2, H*0.7); x.scale(zoom, zoom); x.translate(-W/2, -H*0.7);
+  backdrop(x, W, H, s.place, time, $('theme').value);
+  s.props.forEach((o, n) => { if (o.position !== 'ground') prop(x, W, H, o, s.props.slice(0,n).filter(q => q.position === o.position).length, t, time, s.dur); });
+  const size = Math.min(W*0.5, H*0.4);
+  s.cast.forEach((who, n) => {
+    const fx = {left:0.22, center:0.5, right:0.78}[who.position];
+    const facing = who.position === 'right' ? -1 : 1;
+    person(x, who, W*fx, H*0.79, size, t, time, n === 0 ? level : 0, facing);
+  });
+  s.props.forEach((o, n) => { if (o.position === 'ground') prop(x, W, H, o, 1 + s.props.slice(0,n).filter(q => q.position === 'ground').length, t, time, s.dur); });
+  x.restore();
+  if (s.text){
+    const f = fitText(x, s.text, W*0.84, H*0.12, 48), lh = f.size*1.25, boxH = f.lines.length*lh + 24, top = H*0.9 - boxH/2;
+    x.globalAlpha = smooth(t/0.25);
+    box(x, W*0.04, top, W*0.92, boxH, 'rgba(15,16,32,.75)');
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    f.lines.forEach((line, row) => x.fillText(line, W/2, top + 12 + lh*(row + 0.5)));
+  }
+  // quick fade between scenes
+  const dark = i > 0 ? 1 - Math.min(1, t/0.18) : 0;
+  if (dark > 0){ x.globalAlpha = dark*0.6; box(x,0,0,W,H,'#000'); }
+  const length = list.reduce((n,s) => n + s.dur, 0);
+  x.globalAlpha = 1; box(x, 0, H-8, W*Math.min(1, time/length), 8, THEMES[$('theme').value][2]);
+}
+
+// how far the mouth opens at a moment in the narration
+function loudness(buffers, t){
+  for (const b of buffers){
+    if (t < b.duration){
+      const d = b.getChannelData(0), from = Math.floor(t*b.sampleRate), to = Math.min(d.length, from + Math.floor(b.sampleRate*0.04));
+      let sum = 0, n = 0; for (let i = from; i < to; i += 3){ sum += d[i]*d[i]; n++; }
+      return Math.min(1, Math.sqrt(sum/(n || 1))*6);
+    }
+    t -= b.duration;
+  }
+  return 0;
+}
+
+function resize(){
+  const v = $('shape').value === 'v';
+  $('makeCanvas').width = v ? 720 : 1280; $('makeCanvas').height = v ? 1280 : 720;
+}
+function still(){
+  resize();
+  drawScene([{text:'Your cartoon appears here', place:'outdoors', dur:5, props:[{emoji:'🚀', position:'top', motion:'still'}],
+    cast:[{who:0, position:'left', action:'wave', mood:'happy'},{who:1, position:'right', action:'point', mood:'surprised'}]}], 2);
+}
+['shape','theme'].forEach(id => $(id).addEventListener('input', still));
+
+let saved = null; // keeps the script and voice so a retry does not use your limit again
+
+$('makeBtn').onclick = async () => {
+  const prompt = $('prompt').value.trim(), key = $('key').value.trim();
+  if (!key){ $('makeStatus').textContent = 'Paste your Gemini API key first.'; return; }
+  if (!prompt){ $('makeStatus').textContent = 'Write what you want in your video.'; return; }
+  store.set(key);
+  const ac = getAudio(), minutes = +$('length').value, speaker = $('speaker').value;
+  const id = JSON.stringify([prompt, minutes, speaker]);
+  setBusy(true); abort = new AbortController();
+  const signal = abort.signal;
+  $('stopBtn').hidden = false; $('stopBtn').disabled = false;
+  let recorder = null, lock = null, sources = [];
+  try {
+    try { lock = await navigator.wakeLock?.request('screen'); } catch (e){}
+    if (!saved || saved.id !== id){
+      $('makeStatus').textContent = 'Writing your script...';
+      saved = {id, ...await writeScript(prompt, minutes, signal)};
+    }
+    $('scriptOut').textContent = saved.title + '\n\n' + saved.list.map(s => s.narration).join('\n\n');
+    await narrate(ac, saved, speaker, signal);
+    if (signal.aborted) throw new Error('Stopped.');
+    if (document.hidden) throw new Error('Your voice is ready. Keep this tab open and tap Make my video again.');
+    await ac.resume();
+    resize();
+    const list = saved.list, length = saved.audio.reduce((n,b) => n + b.duration, 0);
+    const dest = ac.createMediaStreamDestination();
+    drawScene(list, 0);
+    recorder = startRecorder($('makeCanvas'), dest.stream, 2500000);
+    const begin = ac.currentTime + 0.1;
+    let at = begin;
+    for (const buffer of saved.audio){
+      const source = ac.createBufferSource(); source.buffer = buffer;
+      source.connect(dest); source.connect(ac.destination); source.start(at);
+      at += buffer.duration; sources.push(source);
+    }
+    await new Promise((res, rej) => {
+      let frame;
+      cancel = msg => { cancelAnimationFrame(frame); rej(new Error(msg)); };
+      signal.addEventListener('abort', () => cancel && cancel('Stopped.'), {once:true});
+      const tick = () => {
+        const t = Math.max(0, ac.currentTime - begin);
+        drawScene(list, Math.min(t, length - 0.01), loudness(saved.audio, t));
+        $('makeStatus').textContent = `Recording ${clock(Math.min(t,length))} of ${clock(length)}. Keep this tab open.`;
+        if (t < length) frame = requestAnimationFrame(tick); else res();
+      };
+      frame = requestAnimationFrame(tick);
+    });
+    showResult($('makeResult'), await recorder.stop(), 'animated-video');
+    $('makeStatus').textContent = 'Your video is ready. Save it now.';
+  } catch (e){
+    if (recorder) recorder.stop();
+    $('makeStatus').textContent = e.message;
+  } finally {
+    sources.forEach(s => { try { s.stop(); } catch (e){} });
+    if (lock) lock.release().catch(() => {});
+    cancel = null; abort = null; $('stopBtn').hidden = true; setBusy(false);
+  }
+};
+$('stopBtn').onclick = () => abort && abort.abort();
+
+/* ---------- Clipper ---------- */
+const video = $('src'), small = document.createElement('canvas');
+let videoNode = null, videoDest = null;
+small.width = 36; small.height = 64;
+
+function cover(ctx, W, H, pos){
+  const vw = video.videoWidth, vh = video.videoHeight, s = Math.max(W/vw, H/vh);
+  ctx.drawImage(video, (W - vw*s)*pos, (H - vh*s)/2, vw*s, vh*s);
+}
+
+function drawClip(){
+  const c = $('clipCanvas'), x = c.getContext('2d'), W = c.width, H = c.height;
+  x.fillStyle = '#000'; x.fillRect(0,0,W,H);
+  if (video.videoWidth){
+    if ($('layout').value === 'fill') cover(x, W, H, +$('pos').value);
+    else {
+      cover(small.getContext('2d'), small.width, small.height, 0.5);
+      x.drawImage(small, 0, 0, W, H);
+      x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(0,0,W,H);
+      const s = Math.min(W/video.videoWidth, H/video.videoHeight), w = video.videoWidth*s, h = video.videoHeight*s;
+      x.drawImage(video, (W-w)/2, (H-h)/2, w, h);
+    }
+  }
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+  const label = (text, cy, maxH, size) => {
+    if (!text.trim()) return;
+    const f = fitText(x, text.trim(), W*0.86, maxH, size);
+    f.lines.forEach((l, i) => {
+      const y = cy + (i - (f.lines.length-1)/2)*f.size*1.2;
+      x.lineWidth = f.size*0.2; x.strokeStyle = '#000'; x.strokeText(l, W/2, y);
+      x.fillStyle = '#fff'; x.fillText(l, W/2, y);
+    });
+  };
+  label($('hook').value, H*0.15, H*0.18, 64);
+  label($('credit').value, H*0.92, H*0.06, 34);
+}
+
+['layout','pos','hook','credit'].forEach(id => $(id).addEventListener('input', () => { if (!busy) drawClip(); }));
+['loadeddata','seeked','timeupdate'].forEach(ev => video.addEventListener(ev, () => { if (!busy) drawClip(); }));
+
+$('file').onchange = () => {
+  const f = $('file').files[0]; if (!f) return;
+  URL.revokeObjectURL(video.src);
+  $('clipBtn').disabled = true; $('clipStatus').textContent = 'Loading video...';
+  video.src = URL.createObjectURL(f); video.hidden = false; video.load();
+};
+video.addEventListener('loadedmetadata', () => {
+  $('start').value = 0; $('end').value = Math.min(30, Math.floor(video.duration*10)/10);
+  $('clipBtn').disabled = false; $('clipStatus').textContent = 'Pick the start and end of your clip.';
+});
+video.addEventListener('error', () => { $('clipStatus').textContent = 'This video could not be opened. Try an MP4 file.'; });
+$('setStart').onclick = () => $('start').value = video.currentTime.toFixed(1);
+$('setEnd').onclick = () => $('end').value = video.currentTime.toFixed(1);
+
+function seek(t){
+  return new Promise(res => {
+    if (Math.abs(video.currentTime - t) < 0.01 && !video.seeking) return res();
+    video.addEventListener('seeked', res, {once:true}); video.currentTime = t;
+  });
+}
+
+$('clipBtn').onclick = async () => {
+  const a = +$('start').value, b = Math.min(+$('end').value, video.duration);
+  if (!(a >= 0 && b - a >= 1)){ $('clipStatus').textContent = 'The end must be at least 1 second after the start.'; return; }
+  const ac = getAudio();
+  const prime = video.play(); // iPad only allows sound if play starts on a tap
+  setBusy(true);
+  let recorder = null;
+  try {
+    await prime.catch(() => {}); video.pause();
+    if (!videoNode){
+      videoNode = ac.createMediaElementSource(video);
+      videoDest = ac.createMediaStreamDestination();
+      videoNode.connect(videoDest); videoNode.connect(ac.destination);
+    }
+    await seek(a); drawClip();
+    await video.play();
+    recorder = startRecorder($('clipCanvas'), videoDest.stream);
+    await new Promise((res, rej) => {
+      let id;
+      cancel = msg => { cancelAnimationFrame(id); rej(new Error(msg)); };
+      const tick = () => {
+        drawClip();
+        $('clipStatus').textContent = `Recording ${Math.max(0, video.currentTime - a).toFixed(0)} of ${(b-a).toFixed(0)} seconds. Keep this tab open.`;
+        if (video.currentTime < b && !video.ended) id = requestAnimationFrame(tick); else res();
+      };
+      id = requestAnimationFrame(tick);
+    });
+    video.pause();
+    showResult($('clipResult'), await recorder.stop(), 'clip');
+    $('clipStatus').textContent = 'Your clip is ready.';
+  } catch (e){
+    video.pause(); if (recorder) recorder.stop();
+    $('clipStatus').textContent = e.message;
+  } finally { cancel = null; setBusy(false); }
+};
+
+/* ---------- YouTube moments ---------- */
+let player = null, videoId = '', pending = null, moments = [];
+try { moments = JSON.parse(localStorage.getItem('moments')) || []; } catch (e){}
+
+function clock(s){
+  s = Math.floor(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = String(s%60).padStart(2,'0');
+  return h ? `${h}:${String(m).padStart(2,'0')}:${sec}` : `${m}:${sec}`;
+}
+function parseId(link){
+  try {
+    const u = new URL(link.trim()), host = u.hostname.replace(/^(www|m)\./,'');
+    let id = '';
+    if (host === 'youtu.be') id = u.pathname.split('/')[1];
+    else if (host === 'youtube.com') id = u.searchParams.get('v') || u.pathname.match(/^\/(?:live|shorts|embed)\/([^/]+)/)?.[1];
+    return /^[\w-]{11}$/.test(id || '') ? id : '';
+  } catch (e){ return ''; }
+}
+const momentLink = m => `https://www.youtube.com/watch?v=${m.id}&t=${m.start}s`;
+
+function renderMoments(){
+  const ol = $('moments'); ol.textContent = '';
+  moments.forEach((m, i) => {
+    const li = document.createElement('li');
+    const a = Object.assign(document.createElement('a'), {href:momentLink(m), target:'_blank', rel:'noopener', textContent:`${clock(m.start)} to ${clock(m.end)}`});
+    const del = Object.assign(document.createElement('button'), {textContent:'Remove'});
+    del.style.marginLeft = '8px';
+    del.onclick = () => { moments.splice(i,1); saveMoments(); };
+    li.append(a, del); ol.append(li);
+  });
+}
+function saveMoments(){ try { localStorage.setItem('moments', JSON.stringify(moments)); } catch (e){} renderMoments(); }
+
+function loadApi(){
+  if (window.YT && YT.Player) return Promise.resolve();
+  return new Promise((res, rej) => {
+    window.onYouTubeIframeAPIReady = res;
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    tag.onerror = () => { tag.remove(); rej(); };
+    document.head.append(tag);
+  });
+}
+const marks = on => ['markStart','markEnd','last30'].forEach(id => $(id).disabled = !on);
+
+$('ytLoad').onclick = async () => {
+  const id = parseId($('yt').value);
+  if (!id){ $('ytStatus').textContent = 'That does not look like a YouTube video link.'; return; }
+  $('ytStatus').textContent = 'Loading...';
+  try { await loadApi(); } catch (e){ $('ytStatus').textContent = 'Could not load the YouTube player.'; return; }
+  videoId = id; pending = null;
+  if (player){ player.loadVideoById(id); marks(true); $('ytStatus').textContent = 'Play, then mark the moments you like.'; return; }
+  player = new YT.Player('player', {videoId:id, playerVars:{playsinline:1, origin:location.origin},
+    events:{
+      onReady(){ marks(true); $('ytStatus').textContent = 'Play, then mark the moments you like.'; },
+      onError(){ $('ytStatus').textContent = 'This video cannot be played here. The owner may have blocked embedding.'; }
+    }});
+};
+const now = () => Math.floor(player.getCurrentTime() || 0);
+function addMoment(start, end){
+  moments.push({id:videoId, start, end}); saveMoments();
+  $('ytStatus').textContent = `Saved ${clock(start)} to ${clock(end)}.`;
+}
+$('markStart').onclick = () => { pending = now(); $('ytStatus').textContent = `Start marked at ${clock(pending)}. Now mark the end.`; };
+$('markEnd').onclick = () => {
+  const end = now();
+  if (pending === null || end <= pending){ $('ytStatus').textContent = 'Mark a start first, then an end after it.'; return; }
+  addMoment(pending, end); pending = null;
+};
+$('last30').onclick = () => { const end = now(); if (end > 0) addMoment(Math.max(0, end-30), end); };
+$('copyBtn').onclick = async () => {
+  const text = moments.map(m => `${clock(m.start)} to ${clock(m.end)}  ${momentLink(m)}`).join('\n');
+  try { await navigator.clipboard.writeText(text); $('copyStatus').textContent = 'Copied.'; }
+  catch (e){ $('copyStatus').textContent = 'Could not copy.'; }
+};
+$('clearBtn').onclick = () => { if (confirm('Delete all saved moments?')){ moments = []; saveMoments(); } };
+
+still(); drawClip(); renderMoments();
+</script>
+</body>
+</html>
